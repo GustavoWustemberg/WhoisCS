@@ -59,7 +59,6 @@ export default function DNSAnalyzer() {
           <h1 className="text-3xl md:text-5xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight drop-shadow-sm">
             Analisador de Domínios
           </h1>
-          <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">Verifique apontamentos e SSL em segundos</p>
         </header>
 
         {/* Barra de Busca */}
@@ -121,6 +120,50 @@ export default function DNSAnalyzer() {
                 <p><strong className="text-gray-900 dark:text-gray-100">IP WWW:</strong> {result.ipWWW}</p>
                 <p><strong className="text-gray-900 dark:text-gray-100">IPv6 Principal:</strong> {result.hasIpv6Main ? <span className="text-orange-600 dark:text-orange-400 font-semibold">Detectado</span> : 'Não detectado'}</p>
                 <p><strong className="text-gray-900 dark:text-gray-100">IPv6 WWW:</strong> {result.hasIpv6WWW ? <span className="text-orange-600 dark:text-orange-400 font-semibold">Detectado</span> : 'Não detectado'}</p>
+                
+                {result.ns && result.ns.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                    <p className="font-bold text-gray-900 dark:text-gray-100 mb-1">Servidores de Nome (NS):</p>
+                    <ul className="list-disc list-inside space-y-1 text-sm opacity-80 mb-3">
+                      {result.ns.map((ns: string, idx: number) => (
+                        <li key={idx}>{ns}</li>
+                      ))}
+                    </ul>
+
+                    {/* Cloudflare Access Status */}
+                    {(() => {
+                      const ourCloudflareNS = [
+                        'craig.ns.cloudflare.com',
+                        'jacqueline.ns.cloudflare.com',
+                        'matias.ns.cloudflare.com',
+                        'annalise.ns.cloudflare.com'
+                      ];
+                      const hasAccess = result.ns.some((ns: string) => 
+                        ourCloudflareNS.includes(ns.toLowerCase())
+                      );
+                      
+                      return (
+                        <div className={`mt-2 p-2 rounded-lg border text-xs font-bold flex items-center gap-2 ${
+                          hasAccess 
+                            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-500 text-emerald-700 dark:text-emerald-400' 
+                            : 'bg-rose-50 dark:bg-rose-900/20 border-rose-500 text-rose-700 dark:text-rose-400'
+                        }`}>
+                          {hasAccess ? (
+                            <>
+                              <CheckCircle size={16} />
+                              <span>Temos acesso</span>
+                            </>
+                          ) : (
+                            <>
+                              <XCircle size={16} />
+                              <span>Sem acesso</span>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
 
               {result.ipA && result.ipWWW && result.ipA !== result.ipWWW && (
@@ -130,13 +173,76 @@ export default function DNSAnalyzer() {
                 </div>
               )}
 
-              {(result.hasIpv6Main || result.hasIpv6WWW) && (
+              {result.isOldServer && (
+                <div className="mt-4 bg-red-100 dark:bg-red-900/40 border-l-4 border-red-500 p-3 rounded-r flex items-start text-red-800 dark:text-red-300 text-sm font-bold">
+                  <AlertTriangle size={18} className="mr-2 flex-shrink-0 mt-0.5" />
+                  <p>O domínio ainda está apontado para o IP antigo. É necessário realizar a migração para o novo servidor para restabelecer o serviço.</p>
+                </div>
+              )}
+
+              {result.hasIpv6Main || result.hasIpv6WWW ? (
                 <div className="mt-4 bg-orange-50 dark:bg-orange-900/20 border-l-4 border-orange-500 p-3 rounded-r flex items-start text-orange-800 dark:text-orange-400 text-sm">
                   <AlertTriangle size={18} className="mr-2 flex-shrink-0 mt-0.5" />
                   <p>Atenção: Apontamento IPv6 (AAAA) detectado. Nossos servidores não suportam IPv6, o que pode impedir a ativação do certificado de segurança (SSL). Recomenda-se remover os apontamentos AAAA.</p>
                 </div>
+              ) : null}
+
+              {result.dnsHistory?.wasOurCustomer && (
+                <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-3 rounded-r flex flex-col gap-2 text-blue-800 dark:text-blue-300 text-sm">
+                  <div className="flex items-start">
+                    <Clock size={18} className="mr-2 flex-shrink-0 mt-0.5" />
+                    <p className="font-bold">Histórico identificado:</p>
+                  </div>
+                  <p>Este domínio já esteve apontado para nossos servidores no passado.</p>
+                  <p className="text-xs opacity-80 italic">Última data vista em nossos IPs: <strong className="not-italic text-sm">{safeFormatDate(result.dnsHistory.lastSeenDate)}</strong></p>
+                </div>
               )}
             </StatusCard>
+
+            {/* Card: Contato Técnico (Only if Registro.br NS) */}
+            {result.isRegistroBrNS && result.technicalContact && (
+              <StatusCard
+                title="Contato Técnico"
+                status="info"
+                icon={<ShieldCheck size={24} />}
+                description="Informação extraída para domínios Registro.br"
+              >
+                <div className="mt-4 space-y-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-gray-900 dark:text-gray-100">Contato (ID):</p>
+                    <p className="text-lg text-gray-800 dark:text-white">
+                      {result.technicalContact.techId || 'Não informado'}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-gray-900 dark:text-gray-100">E-mail:</p>
+                    <p className="text-lg text-gray-800 dark:text-white break-all">
+                      {result.technicalContact.email || 'Não informado'}
+                    </p>
+                  </div>
+
+                  {/* Access Status Indicator */}
+                  <div className={`mt-4 p-3 rounded-xl border flex items-center gap-2 font-bold ${
+                    result.technicalContact.techId === 'ROCMA135' 
+                      ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-500 text-emerald-700 dark:text-emerald-400' 
+                      : 'bg-rose-50 dark:bg-rose-900/20 border-rose-500 text-rose-700 dark:text-rose-400'
+                  }`}>
+                    {result.technicalContact.techId === 'ROCMA135' ? (
+                      <>
+                        <CheckCircle size={20} />
+                        <span>Temos acesso</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle size={20} />
+                        <span>Sem acesso</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </StatusCard>
+            )}
 
             {/* Card: SSL */}
             <StatusCard

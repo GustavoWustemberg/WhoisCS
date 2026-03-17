@@ -1,7 +1,15 @@
 // @ts-ignore
 import whois from 'whois-json';
 
-export async function checkWhois(domain: string): Promise<string | null> {
+export interface WhoisResult {
+    expiryDate: string | null;
+    technicalContact: {
+        techId: string | null;
+        email: string | null;
+    } | null;
+}
+
+export async function checkWhois(domain: string): Promise<WhoisResult> {
     const timeoutMs = 10000;
 
     try {
@@ -14,12 +22,20 @@ export async function checkWhois(domain: string): Promise<string | null> {
 
         const data = await dataResponse;
 
-        if (!data) return null;
+        if (!data) return { expiryDate: null, technicalContact: null };
 
         // Different TLDs have different field names for expiration date
-        return data.expiryDate || data.expires || data.paidUntil || data.registryExpiryDate || data.registrarRegistrationExpirationDate || null;
+        const expiryDate = data.expiryDate || data.expires || data.paidUntil || data.registryExpiryDate || data.registrarRegistrationExpirationDate || null;
+
+        return {
+            expiryDate,
+            technicalContact: {
+                techId: data.techC || null,
+                email: data.eMail || null
+            }
+        };
     } catch (err) {
         console.error(`Whois Error for ${domain}:`, err);
-        return null;
+        return { expiryDate: null, technicalContact: null };
     }
 }

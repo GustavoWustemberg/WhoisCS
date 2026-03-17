@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import NodeCache from 'node-cache';
@@ -5,6 +6,7 @@ import { normalizeDomain, formatDate } from './utils/normalize';
 import { checkDNS } from './services/dnsService';
 import { checkSSL } from './services/sslService';
 import { checkWhois } from './services/whoisService';
+import { checkHistory } from './services/historyService';
 
 const app = express();
 const port = process.env.PORT || 3333;
@@ -13,7 +15,9 @@ const port = process.env.PORT || 3333;
 const pCache = new NodeCache({ stdTTL: 3600 });
 
 // NOSSOS_IPS configuration (could be moved to env vars later)
-const NOSSOS_IPS = ['149.18.102.233', '149.18.102.227'];
+const NOSSOS_IPS = ["149.18.102.227", "149.18.102.228", "149.18.102.229", "149.18.102.230", "149.18.102.231", "149.18.102.232", "149.18.102.233", "149.18.102.234", "149.18.102.235", "149.18.102.236", "149.18.102.237", "149.18.102.238"];
+
+const NOSSOS_IPS_ANTIGOS = ["169.57.141.94", "169.57.169.85", "169.57.141.90"];
 
 app.use(cors({
     origin: 'http://localhost:3000',
@@ -38,25 +42,43 @@ const analyzeHandler = async (req: express.Request, res: express.Response) => {
         }
 
         // Run all checks in parallel
-        const [dnsData, sslData, expiryDate] = await Promise.all([
+        const [dnsData, sslData, whoisData] = await Promise.all([
             checkDNS(domain),
             checkSSL(domain),
             checkWhois(domain)
         ]);
 
         const isOurServer = NOSSOS_IPS.includes(dnsData.ipMain);
+        const isOldServer = NOSSOS_IPS_ANTIGOS.includes(dnsData.ipMain);
+
+        // DNS History check if not current
+        let dnsHistory = null;
+        if (!isOurServer && !isOldServer) {
+            dnsHistory = await checkHistory(domain, NOSSOS_IPS, NOSSOS_IPS_ANTIGOS);
+        }
+
+        // Registro.br NS check: name servers containing 'auto.dns' or 'sec.dns.br'
+        const isRegistroBrNS = dnsData.ns.some(ns => 
+            ns.toLowerCase().includes('auto.dns') || 
+            ns.toLowerCase().includes('sec.dns.br')
+        );
 
         const result = {
             domain,
             ipA: dnsData.ipMain,
             ipWWW: dnsData.ipWWW,
             isOurServer,
+            isOldServer,
+            dnsHistory,
             hasIpv6Main: dnsData.hasIpv6Main,
             hasIpv6WWW: dnsData.hasIpv6WWW,
             sslStatus: sslData.valid ? 'Ativo' : 'Inativo/Erro',
             sslExpiry: formatDate(sslData.expiry),
             sslIssuer: sslData.issuer,
-            domainExpiry: formatDate(expiryDate),
+            domainExpiry: formatDate(whoisData.expiryDate),
+            ns: dnsData.ns,
+            isRegistroBrNS,
+            technicalContact: isRegistroBrNS ? whoisData.technicalContact : null
         };
 
         // Store in cache

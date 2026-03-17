@@ -5,6 +5,7 @@ export interface DNSResult {
     ipWWW: string;
     hasIpv6Main: boolean;
     hasIpv6WWW: boolean;
+    ns: string[];
 }
 
 export async function checkDNS(domain: string): Promise<DNSResult> {
@@ -29,25 +30,28 @@ export async function checkDNS(domain: string): Promise<DNSResult> {
     };
 
     try {
-        const [ipMain, ipWWW, ipv6Main, ipv6WWW] = await Promise.allSettled([
+        const [ipMain, ipWWW, ipv6Main, ipv6WWW, nsRecords] = await Promise.allSettled([
             resolveA(domain),
             resolveA(`www.${domain}`),
             resolveAAAA(domain),
-            resolveAAAA(`www.${domain}`)
+            resolveAAAA(`www.${domain}`),
+            dns.promises.resolveNs(domain)
         ]);
 
         return {
             ipMain: ipMain.status === 'fulfilled' ? ipMain.value : 'Não encontrado',
             ipWWW: ipWWW.status === 'fulfilled' ? ipWWW.value : 'Não encontrado',
             hasIpv6Main: ipv6Main.status === 'fulfilled' ? ipv6Main.value : false,
-            hasIpv6WWW: ipv6WWW.status === 'fulfilled' ? ipv6WWW.value : false
+            hasIpv6WWW: ipv6WWW.status === 'fulfilled' ? ipv6WWW.value : false,
+            ns: nsRecords.status === 'fulfilled' ? nsRecords.value : []
         };
     } catch (err) {
         return {
             ipMain: 'Não encontrado',
             ipWWW: 'Não encontrado',
             hasIpv6Main: false,
-            hasIpv6WWW: false
+            hasIpv6WWW: false,
+            ns: []
         };
     }
 }

@@ -1,24 +1,29 @@
 # WhoisCS
 
-WhoisCS é um analisador de domínios robusto que permite verificar rapidamente apontamentos DNS, status de certificados SSL e informações de expiração via WHOIS. O projeto foi desenvolvido com uma arquitetura separada entre Frontend e Backend para garantir escalabilidade e organização.
+WhoisCS é um analisador de domínios robusto que permite verificar rapidamente apontamentos DNS, status de certificados SSL, informações de Name Servers (NS) e expiração via WHOIS. O projeto foi desenhado para analistas técnicos que precisam de uma visão clara da infraestrutura de rede de um domínio.
 
 ## 🚀 Funcionalidades
 
 - **Análise de DNS**: Verifica o IP principal (A) e o IP do subdomínio `www`.
-- **Detecção de IPv6**: Alerta sobre a presença de registros AAAA que podem causar problemas com SSL em certos ambientes.
-- **Status SSL**: Verifica se o certificado SSL está ativo, o emissor e a data de expiração.
-- **WHOIS**: Consulta a data de expiração do domínio e alerta se estiver expirado.
-- **Cache Inteligente**: O backend utiliza cache para otimizar consultas repetidas e reduzir a latência.
-- **Interface Moderna**: UI responsiva com suporte a Dark Mode e indicadores visuais claros (estilo semáforo).
+- **DNS History**: Busca automática de histórico para identificar se o domínio já apontou para nossa infraestrutura no passado (utiliza DomScan/SecurityTrails).
+- **Análise de Name Servers (NS)**:
+    - Identifica Name Servers do **Registro.br** e **Cloudflare**.
+    - Exibe status de acesso baseado no ID do Contato Técnico ou NS específicos.
+- **Alertas de Migração**: Identifica se o domínio está apontado para servidores antigos (legacy) e recomenda a migração.
+- **Status SSL**: Verifica se o certificado SSL está ativo, o emissor e a data de expiração com validação de expiração em tempo real.
+- **WHOIS**: Consulta a data de expiração do domínio e exibe o ID do contato técnico para domínios `.br`.
+- **Cache Inteligente**: O backend utiliza cache (1 hora) para otimizar consultas repetidas.
+- **Interface Moderna**: UI responsiva com indicadores visuais de "acesso garantido" e alertas de segurança.
 
 ## 🛠️ Tecnologias
 
 ### [BackEnd](./BackEnd)
 - **Node.js** com **Express**
 - **TypeScript** para tipagem estática
-- **node-cache** para gerenciamento de cache em memória
-- **whois-json** para extração de dados de domínio
+- **node-cache** para gerenciamento de cache
+- **whois-json** para dados de domínio
 - **node-forge** para análise de certificados SSL
+- **dotenv** para gestão de chaves de API
 
 ### [FrontEnd](./FrontEnd)
 - **Next.js** (App Router)
@@ -30,31 +35,28 @@ WhoisCS é um analisador de domínios robusto que permite verificar rapidamente 
 
 ### Pré-requisitos
 - Node.js (v18+)
-- npm ou yarn
+- Chaves de API (opcional para histórico): DomScan ou SecurityTrails
 
 ### 1. Backend
-Navegue até a pasta do backend e instale as dependências:
+Crie um arquivo `.env` na pasta `BackEnd` baseado nas suas chaves:
+```env
+DOMSCAN_API_KEY=sua_chave_aqui
+SECURITY_TRAILS_API_KEY=sua_chave_aqui
+```
+
+Instale as dependências e inicie:
 ```bash
 cd BackEnd
 npm install
-```
-Inicie o servidor de desenvolvimento:
-```bash
 npm run dev
 ```
-O servidor estará rodando em `http://localhost:3333`.
 
 ### 2. Frontend
-Navegue até a pasta do frontend e instale as dependências:
 ```bash
 cd FrontEnd
 npm install
-```
-Inicie o servidor de desenvolvimento:
-```bash
 npm run dev
 ```
-Acesse a aplicação em `http://localhost:3000`.
 
 ## 🔌 API
 
@@ -66,26 +68,16 @@ Analisa um domínio fornecido.
 **Corpo da Requisição:**
 ```json
 {
-  "domain": "exemplo.com"
+  "domain": "exemplo.com.br"
 }
 ```
 
-**Exemplo de Resposta:**
-```json
-{
-  "domain": "exemplo.com",
-  "ipA": "149.18.102.233",
-  "ipWWW": "149.18.102.233",
-  "isOurServer": true,
-  "hasIpv6Main": false,
-  "hasIpv6WWW": false,
-  "sslStatus": "Ativo",
-  "sslExpiry": "15-06-2026",
-  "sslIssuer": "Let's Encrypt",
-  "domainExpiry": "20-01-2027",
-  "fromCache": false
-}
-```
+**Principais Campos da Resposta:**
+- `isOurServer`: Booleano para IPs atuais.
+- `isOldServer`: Alerta de servidor legado.
+- `isRegistroBrNS`: Identifica infraestrutura Registro.br.
+- `dnsHistory`: Objeto com dados históricos (útil para reconquista de clientes).
+- `technicalContact`: Dados do contato (ID e Email).
 
 ## 📄 Licença
 

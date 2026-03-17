@@ -33,9 +33,20 @@ export async function checkSSL(domain: string): Promise<SSLResult> {
                 socket.end();
 
                 const issuerCN = cert.issuer?.CN;
+                const validTo = cert.valid_to;
+                
+                let isExpired = false;
+                if (validTo) {
+                    const expiryDate = new Date(validTo);
+                    isExpired = expiryDate < new Date();
+                }
+
+                const authError = (socket as any).authorizationError;
+                const isValid = socket.authorized && !isExpired && !authError;
+
                 resolve({
-                    valid: socket.authorized,
-                    expiry: cert.valid_to || null,
+                    valid: isValid,
+                    expiry: validTo || null,
                     issuer: Array.isArray(issuerCN) ? issuerCN[0] : (issuerCN || null)
                 });
             });
