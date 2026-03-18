@@ -2,6 +2,8 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import NodeCache from 'node-cache';
+import fs from 'fs';
+import path from 'path';
 import { normalizeDomain, formatDate } from './utils/normalize';
 import { checkDNS } from './services/dnsService';
 import { checkSSL } from './services/sslService';
@@ -19,12 +21,34 @@ const NOSSOS_IPS = ["149.18.102.227", "149.18.102.228", "149.18.102.229", "149.1
 
 const NOSSOS_IPS_ANTIGOS = ["169.57.141.94", "169.57.169.85", "169.57.141.90"];
 
-app.use(cors({
-    origin: 'http://localhost:3000',
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type']
-}));
+// Load Migration Data
+interface MigrationEntry {
+    Dominio: string;
+    "IP atualizado M3": string;
+}
+
+let migrationData: MigrationEntry[] = [];
+try {
+    const migrationFilePath = path.join(__dirname, 'archives', 'migracao.json');
+    if (fs.existsSync(migrationFilePath)) {
+        const rawData = fs.readFileSync(migrationFilePath, 'utf-8');
+        migrationData = JSON.parse(rawData);
+        console.log(`Loaded ${migrationData.length} migration entries.`);
+    } else {
+        console.warn('migracao.json not found in src/archives/');
+    }
+} catch (error) {
+    console.error('Error loading migracao.json:', error);
+}
+
+app.use(cors());
 app.use(express.json());
+
+// Request logging middleware
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
+});
 
 const analyzeHandler = async (req: express.Request, res: express.Response) => {
     try {
@@ -63,6 +87,17 @@ const analyzeHandler = async (req: express.Request, res: express.Response) => {
             ns.toLowerCase().includes('sec.dns.br')
         );
 
+        // Validation against migracao.json
+        let migrationMessage = null;
+        const migrationEntry = migrationData.find(entry => entry.Dominio.toLowerCase() === domain.toLowerCase());
+        
+        if (migrationEntry) {
+            const expectedIP = migrationEntry["IP atualizado M3"];
+            if (dnsData.ipMain !== expectedIP) {
+                migrationMessage = `IP incorreto. Por favor, altere o IP para ${expectedIP}`;
+            }
+        }
+
         const result = {
             domain,
             ipA: dnsData.ipMain,
@@ -78,7 +113,8 @@ const analyzeHandler = async (req: express.Request, res: express.Response) => {
             domainExpiry: formatDate(whoisData.expiryDate),
             ns: dnsData.ns,
             isRegistroBrNS,
-            technicalContact: isRegistroBrNS ? whoisData.technicalContact : null
+            technicalContact: isRegistroBrNS ? whoisData.technicalContact : null,
+            migrationMessage
         };
 
         // Store in cache

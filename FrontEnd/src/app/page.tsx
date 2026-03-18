@@ -173,6 +173,13 @@ export default function DNSAnalyzer() {
                 </div>
               )}
 
+              {result.migrationMessage && (
+                <div className="mt-4 bg-red-100 dark:bg-red-900/40 border-l-4 border-red-500 p-3 rounded-r flex items-start text-red-800 dark:text-red-300 text-sm font-bold">
+                  <AlertTriangle size={18} className="mr-2 flex-shrink-0 mt-0.5" />
+                  <p>{result.migrationMessage}</p>
+                </div>
+              )}
+
               {result.isOldServer && (
                 <div className="mt-4 bg-red-100 dark:bg-red-900/40 border-l-4 border-red-500 p-3 rounded-r flex items-start text-red-800 dark:text-red-300 text-sm font-bold">
                   <AlertTriangle size={18} className="mr-2 flex-shrink-0 mt-0.5" />
