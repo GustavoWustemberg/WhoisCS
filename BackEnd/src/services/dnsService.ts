@@ -1,8 +1,8 @@
 import dns from 'dns';
 
 export interface DNSResult {
-    ipMain: string;
-    ipWWW: string;
+    ipsMain: string[];
+    ipsWWW: string[];
     hasIpv6Main: boolean;
     hasIpv6WWW: boolean;
     ns: string[];
@@ -11,10 +11,10 @@ export interface DNSResult {
 export async function checkDNS(domain: string): Promise<DNSResult> {
     const timeoutMs = 5000;
 
-    const resolveA = (target: string): Promise<string> => {
+    const resolveA = (target: string): Promise<string[]> => {
         return Promise.race([
-            dns.promises.resolve4(target).then(ips => ips[0]),
-            new Promise<string>((_, reject) =>
+            dns.promises.resolve4(target),
+            new Promise<string[]>((_, reject) =>
                 setTimeout(() => reject(new Error('DNS Timeout')), timeoutMs)
             )
         ]);
@@ -30,7 +30,7 @@ export async function checkDNS(domain: string): Promise<DNSResult> {
     };
 
     try {
-        const [ipMain, ipWWW, ipv6Main, ipv6WWW, nsRecords] = await Promise.allSettled([
+        const [ipsMain, ipsWWW, ipv6Main, ipv6WWW, nsRecords] = await Promise.allSettled([
             resolveA(domain),
             resolveA(`www.${domain}`),
             resolveAAAA(domain),
@@ -39,16 +39,16 @@ export async function checkDNS(domain: string): Promise<DNSResult> {
         ]);
 
         return {
-            ipMain: ipMain.status === 'fulfilled' ? ipMain.value : 'Não encontrado',
-            ipWWW: ipWWW.status === 'fulfilled' ? ipWWW.value : 'Não encontrado',
+            ipsMain: ipsMain.status === 'fulfilled' ? ipsMain.value : [],
+            ipsWWW: ipsWWW.status === 'fulfilled' ? ipsWWW.value : [],
             hasIpv6Main: ipv6Main.status === 'fulfilled' ? ipv6Main.value : false,
             hasIpv6WWW: ipv6WWW.status === 'fulfilled' ? ipv6WWW.value : false,
             ns: nsRecords.status === 'fulfilled' ? nsRecords.value : []
         };
     } catch (err) {
         return {
-            ipMain: 'Não encontrado',
-            ipWWW: 'Não encontrado',
+            ipsMain: [],
+            ipsWWW: [],
             hasIpv6Main: false,
             hasIpv6WWW: false,
             ns: []

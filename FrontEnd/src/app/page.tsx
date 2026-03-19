@@ -111,9 +111,9 @@ export default function DNSAnalyzer() {
             {/* Card: Status de Apontamento */}
             <StatusCard
               title="Apontamento DNS"
-              status={result.isOurServer ? 'success' : 'error'}
+              status={result.isOurServer && !result.migrationMessage && !result.hasIpv6Main && !result.hasIpv6WWW ? 'success' : 'error'}
               icon={<Globe size={24} />}
-              description={result.isOurServer ? "Apontado corretamente para nossos servidores" : "Apontado para um servidor externo"}
+              description={result.isOurServer && !result.migrationMessage && !result.hasIpv6Main && !result.hasIpv6WWW ? "Apontado corretamente para nossos servidores" : "Problema ou divergência no apontamento detectada"}
             >
               <div className="mt-4 text-sm space-y-2 text-gray-700 dark:text-gray-300">
                 <p><strong className="text-gray-900 dark:text-gray-100">IP Principal (A):</strong> {result.ipA}</p>

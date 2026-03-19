@@ -72,8 +72,9 @@ const analyzeHandler = async (req: express.Request, res: express.Response) => {
             checkWhois(domain)
         ]);
 
-        const isOurServer = NOSSOS_IPS.includes(dnsData.ipMain);
-        const isOldServer = NOSSOS_IPS_ANTIGOS.includes(dnsData.ipMain);
+        const primaryIP = dnsData.ipsMain[0] || 'Não encontrado';
+        const isOurServer = NOSSOS_IPS.includes(primaryIP);
+        const isOldServer = NOSSOS_IPS_ANTIGOS.includes(primaryIP);
 
         // DNS History check if not current
         let dnsHistory = null;
@@ -87,21 +88,30 @@ const analyzeHandler = async (req: express.Request, res: express.Response) => {
             ns.toLowerCase().includes('sec.dns.br')
         );
 
-        // Validation against migracao.json
+        // Validation against migracao.json and multiple IPs
         let migrationMessage = null;
         const migrationEntry = migrationData.find(entry => entry.Dominio.toLowerCase() === domain.toLowerCase());
-        
-        if (migrationEntry) {
-            const expectedIP = migrationEntry["IP atualizado M3"];
-            if (dnsData.ipMain !== expectedIP) {
-                migrationMessage = `IP incorreto. Por favor, altere o IP para ${expectedIP}`;
-            }
+        const expectedIP = migrationEntry ? migrationEntry["IP atualizado M3"] : null;
+
+        const incorrectIpsMain = dnsData.ipsMain.length > 1 
+            ? dnsData.ipsMain.filter(ip => ip !== expectedIP && !NOSSOS_IPS.includes(ip))
+            : [];
+        const incorrectIpsWWW = dnsData.ipsWWW.length > 1
+            ? dnsData.ipsWWW.filter(ip => ip !== expectedIP && !NOSSOS_IPS.includes(ip))
+            : [];
+            
+        const allIncorrectIps = [...new Set([...incorrectIpsMain, ...incorrectIpsWWW])];
+
+        if (allIncorrectIps.length > 0) {
+            migrationMessage = `Apontamento incorreto. Por favor, solicite a remoção do IP ${allIncorrectIps.join(' e ')}, mantendo exclusivamente o nosso endereço IP.`;
+        } else if (migrationEntry && primaryIP !== expectedIP && primaryIP !== 'Não encontrado') {
+            migrationMessage = `IP incorreto. Por favor, altere o IP para ${expectedIP}`;
         }
 
         const result = {
             domain,
-            ipA: dnsData.ipMain,
-            ipWWW: dnsData.ipWWW,
+            ipA: dnsData.ipsMain.length > 0 ? dnsData.ipsMain.join(' e ') : 'Não encontrado',
+            ipWWW: dnsData.ipsWWW.length > 0 ? dnsData.ipsWWW.join(' e ') : 'Não encontrado',
             isOurServer,
             isOldServer,
             dnsHistory,
